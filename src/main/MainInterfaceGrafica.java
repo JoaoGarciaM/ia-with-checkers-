@@ -37,6 +37,8 @@ public final class MainInterfaceGrafica extends JFrame {
 
     private int vez = 1;
 
+    private boolean sequenciaCaptura = false;
+
     public MainInterfaceGrafica() {
         
         /*
@@ -77,10 +79,17 @@ public final class MainInterfaceGrafica extends JFrame {
 
     private void tratarClique(int linha, int col) {
 
+        boolean checkComer = false;
+
         for(int i = 0; i < TAMANHO; i++){
             for(int j = 0; j < TAMANHO; j++){
                 if((tabuleiroLogico.getMatriz()[i][j] != 0) && (tabuleiroLogico.getMatriz()[i][j] % 2 == vez % 2)); 
+                    if(PossoComer(linha, col, sequenciaCaptura)){
+                        checkComer = true;
+                        break;
+                    }
             }
+            if(checkComer) break;
         }
         
         // Caso 1: Nenhuma peça selecionada ainda
@@ -88,6 +97,10 @@ public final class MainInterfaceGrafica extends JFrame {
             
             // Verifica se a casa clicada contém QUALQUER peça (1, 2, 3 ou 4)
             if ((tabuleiroLogico.getMatriz()[linha][col] != 0) && (tabuleiroLogico.getMatriz()[linha][col] != 'b') && (tabuleiroLogico.getMatriz()[linha][col] % 2 == vez % 2)) {
+                
+                if(checkComer && !PossoComer(linha, col, checkComer)){
+                    return;
+                }
                 linhaOrigem = linha;
                 colOrigem = col;
                 tabuleiroInterface[linha][col].setBackground(Color.YELLOW); // Destaque do clique
@@ -155,6 +168,17 @@ public final class MainInterfaceGrafica extends JFrame {
         return false;
     }
 
+
+    private boolean PossoComer(int linha, int col, boolean Sequencia){
+        int peca = tabuleiroLogico.getMatriz()[linha][col];
+        int[] diagonal;
+
+        if((peca == 3) || (peca == 4)){
+            diagonal = new int[]{-1,1};
+
+
+        } else if (Sequencia)
+    }
     public static void main(String[] args) {
         SwingUtilities.invokeLater(MainInterfaceGrafica::new);
     }
