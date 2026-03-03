@@ -297,7 +297,6 @@ public final class MainInterfaceGrafica extends JFrame {
         return false;
     }
     
-    // Métodos complementares baseados nas regras do seu amigo, adaptados para o seu char[][]
     private boolean caminhoVazio(int r1, int c1, int r2, int c2) {
         int dirLinha = (r2 > r1) ? 1 : -1;
         int dirCol = (c2 > c1) ? 1 : -1;
@@ -315,44 +314,49 @@ public final class MainInterfaceGrafica extends JFrame {
     }
 
     private boolean tentarCapturaDama(int r1, int c1, int r2, int c2) {
-        int dirLinha = (r2 > r1) ? 1 : -1;
-        int dirCol = (c2 > c1) ? 1 : -1;
-        int pecaInimigaLinha = -1;
-        int pecaInimigaCol = -1;
-        int contadorInimigos = 0;
+    int dirLinha = (r2 > r1) ? 1 : -1;
+    int dirCol = (c2 > c1) ? 1 : -1;
+    int pecaInimigaLinha = -1;
+    int pecaInimigaCol = -1;
+    int contadorInimigos = 0;
 
-        int r = r1 + dirLinha;
-        int c = c1 + dirCol;
+    // 1. CALCULA A DISTÂNCIA DO PULO
+    int distLinha = Math.abs(r2 - r1);
+    int distCol = Math.abs(c2 - c1);
 
-        while (r != r2) {
-            char pecaNoCaminho = tabuleiroLogico.getMatriz()[r][c];
-            if (pecaNoCaminho != 0 && pecaNoCaminho != 'b') {
-                // Verifico se é peça do próprio time
-                if (pecaNoCaminho % 2 == tabuleiroLogico.getMatriz()[r1][c1] % 2) return false;
-                
-                contadorInimigos++;
-                pecaInimigaLinha = r;
-                pecaInimigaCol = c;
-            }
-            r += dirLinha;
-            c += dirCol;
+    if(distLinha != distCol) return false; // Dama só pode pular diagonalmente
+
+    
+    // Para a Dama parar logo depois, ela percorre o caminho e a peça inimiga deve estar na penúltima casa do trajeto.
+    int r = r1 + dirLinha;
+    int c = c1 + dirCol;
+
+    while (r != r2) {
+        char pecaNoCaminho = tabuleiroLogico.getMatriz()[r][c];
+        if (pecaNoCaminho != 0 && pecaNoCaminho != 'b') {
+            if (pecaNoCaminho % 2 == tabuleiroLogico.getMatriz()[r1][c1] % 2) return false;
+            
+            contadorInimigos++;
+            pecaInimigaLinha = r;
+            pecaInimigaCol = c;
         }
-
-        // Tem que ter exatamente UMA peça inimiga no caminho desse pulo específico
-        if (contadorInimigos == 1) {
-            int rAposInimiga = pecaInimigaLinha + dirLinha;
-            int cAposInimiga = pecaInimigaCol + dirCol;
-
-            // Se o destino é valido após a peça (a Dama pode parar em qualquer lugar após comer)
-            if (r2 >= rAposInimiga || r2 <= rAposInimiga) {
-                if (moverPecaLogica(r1, c1, r2, c2)) {
-                    tabuleiroLogico.getMatriz()[pecaInimigaLinha][pecaInimigaCol] = 0;
-                    return true;
-                }
-            }
-        }
-        return false;
+        r += dirLinha;
+        c += dirCol;
     }
+
+    if (contadorInimigos == 1) {
+        int distInimigoDestino = Math.abs(r2 - pecaInimigaLinha);
+        
+        // Se a distância for 1, significa que r2 é a casa imediatamente após a peça comida
+        if (distInimigoDestino == 1) {
+            if (moverPecaLogica(r1, c1, r2, c2)) {
+                tabuleiroLogico.getMatriz()[pecaInimigaLinha][pecaInimigaCol] = 0;
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
     private void verificarFimDeJogo() {
         int brancas = 0, pretas = 0;
