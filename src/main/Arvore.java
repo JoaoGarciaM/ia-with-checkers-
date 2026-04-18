@@ -8,7 +8,7 @@ public class Arvore {
     private int profundidadeMaxima;
     private static final int TAMANHO = 6;
 
-    // Mapa para traduzir linha/coluna para as letras exigidas pelo seu Node (origin e dest)
+    // Mapa para traduzir linha/coluna para as letras exigidas pelo seu Node
     private static final char[][] MAPA_LETRAS = {
             { 0, 'A', 0, 'B', 0, 'C' },
             { 'D', 0, 'E', 0, 'F', 0 },
@@ -29,43 +29,107 @@ public class Arvore {
         this.raiz.setMatrix(copiarMatriz(tabuleiro.getMatriz()));
         this.raiz.setTurn(turnoBrancas);
         
-        // Inicia a construção dos galhos (linhas do tempo)
-        construirArvore(this.raiz, tabuleiro, 0);
-    }
-
-    private void construirArvore(Node pai, Tabuleiro tabAtual, int profundidade) {
-        // Condição de parada: a IA atingiu o limite de "visão do futuro"
-        if (profundidade >= profundidadeMaxima) return;
-
-        int vez = pai.isTurn() ? 1 : 2;
+        int vez = turnoBrancas ? 1 : 2;
         
-        // A Árvore gera as próprias jogadas para prever o futuro rápido
-        ArrayList<int[]> jogadas = gerarJogadasPossiveis(tabAtual, vez);
+        // Pega as opções do presente (Nível 1)
+        ArrayList<int[]> jogadasDaRaiz = gerarJogadasPossiveis(tabuleiro, vez);
 
-        for (int[] jogada : jogadas) {
+        int bestValue = Integer.MIN_VALUE;
+        int alpha = Integer.MIN_VALUE;
+        int beta = Integer.MAX_VALUE;
+
+        // Instancia na memória APENAS os filhos diretos
+        for (int[] jogada : jogadasDaRaiz) {
             int lOrig = jogada[0], cOrig = jogada[1], lDest = jogada[2], cDest = jogada[3];
 
-            // 1. Clona o tabuleiro e aplica o movimento (simulação)
-            Tabuleiro cloneTab = tabAtual.clone();
-            aplicarMovimentoSimulado(cloneTab, lOrig, cOrig, lDest, cDest);
+            // Simula o movimento
+            Tabuleiro tFilho = tabuleiro.clone();
+            aplicarMovimentoSimulado(tFilho, lOrig, cOrig, lDest, cDest);
 
-            // 2. Cria o nó filho usando a sua classe Node
+            // Cria o nó
             Node filho = new Node();
             filho.setOrigin(MAPA_LETRAS[lOrig][cOrig]);
             filho.setDest(MAPA_LETRAS[lDest][cDest]);
-            filho.setMatrix(copiarMatriz(cloneTab.getMatriz()));
-            filho.setTurn(!pai.isTurn()); // Passa a vez pro adversário na simulação
+            filho.setMatrix(copiarMatriz(tFilho.getMatriz()));
+            filho.setTurn(!turnoBrancas);
 
-            // 3. Adiciona na árvore usando o método que você criou
-            pai.addChild(filho);
+            // Manda a IA avaliar o futuro DENTRO da memória RAM usando poda Alpha-Beta
+            int score = calcularAlphaBeta(tFilho, 1, alpha, beta, !turnoBrancas);
+            filho.setMinMax(score);
+            
+            this.raiz.addChild(filho);
 
-            // 4. Desce mais um nível na recursão
-            construirArvore(filho, cloneTab, profundidade + 1);
+            // A Raiz sempre quer o MAIOR valor possível para o turno dela
+            if (score > bestValue) {
+                bestValue = score;
+                // SALVA A MEMÓRIA: Guarda qual foi a jogada que deu a nota máxima!
+                this.raiz.setMelhorFilho(filho); 
+            }
+            alpha = Math.max(alpha, bestValue);
+        }
+        
+        this.raiz.setMinMax(bestValue);
+    }
+
+    // Prevê o futuro sem gastar a memória instanciando Nodes
+    private int calcularAlphaBeta(Tabuleiro tabAtual, int profundidade, int alpha, int beta, boolean turnoBrancas) {
+        // Condição de parada (Limite de visão)
+        if (profundidade >= profundidadeMaxima) {
+            return avaliarTabuleiro(tabAtual.getMatriz());
+        }
+
+        int vez = turnoBrancas ? 1 : 2;
+        ArrayList<int[]> jogadas = gerarJogadasPossiveis(tabAtual, vez);
+
+        // Se o jogador está travado sem jogadas
+        if (jogadas.isEmpty()) {
+            return turnoBrancas ? -10000 : 10000;
+        }
+
+        if (turnoBrancas == this.raiz.isTurn()) { 
+            int maxEval = Integer.MIN_VALUE;
+            for (int[] jogada : jogadas) {
+                Tabuleiro clone = tabAtual.clone();
+                aplicarMovimentoSimulado(clone, jogada[0], jogada[1], jogada[2], jogada[3]);
+
+                int eval = calcularAlphaBeta(clone, profundidade + 1, alpha, beta, !turnoBrancas);
+                maxEval = Math.max(maxEval, eval);
+                alpha = Math.max(alpha, eval);
+                
+                if (beta <= alpha) break; // Poda (corta a árvore)
+            }
+            return maxEval;
+        } 
+        else { 
+            int minEval = Integer.MAX_VALUE;
+            for (int[] jogada : jogadas) {
+                Tabuleiro clone = tabAtual.clone();
+                aplicarMovimentoSimulado(clone, jogada[0], jogada[1], jogada[2], jogada[3]);
+
+                int eval = calcularAlphaBeta(clone, profundidade + 1, alpha, beta, !turnoBrancas);
+                minEval = Math.min(minEval, eval);
+                beta = Math.min(beta, eval);
+                
+                if (beta <= alpha) break; // Poda Alpha-Beta
+            }
+            return minEval;
         }
     }
 
-
-    // LÓGICA INTERNA DA ÁRVORE (GERAÇÃO DE MOVIMENTOS E SIMULAÇÃO MATEMÁTICA)
+    // Heurística simples: Conta as peças e dá peso maior para as damas
+    private int avaliarTabuleiro(char[][] m) {
+        int pontuacao = 0;
+        for (int i = 0; i < 6; i++) {
+            for (int j = 0; j < 6; j++) {
+                char peca = m[i][j];
+                if (peca == '2') pontuacao += 10;       // Peça normal da IA
+                else if (peca == '4') pontuacao += 30;  // Dama da IA
+                else if (peca == '1') pontuacao -= 10;  // Peça normal do Jogador
+                else if (peca == '3') pontuacao -= 30;  // Dama do Jogador
+            }
+        }
+        return pontuacao;
+    }
 
     private ArrayList<int[]> gerarJogadasPossiveis(Tabuleiro tab, int vez) {
         ArrayList<int[]> movimentos = new ArrayList<>();
@@ -77,14 +141,12 @@ public class Arvore {
                 char peca = m[i][j];
                 if (peca != '0' && peca != 'b' && (peca % 2 == vez % 2)) {
                     buscarCapturas(m, i, j, peca, capturas);
-                    // Só busca movimento normal se ainda não achou nenhuma captura (regra de comer obrigatório)
                     if (capturas.isEmpty()) {
                         buscarMovimentosNormais(m, i, j, peca, movimentos);
                     }
                 }
             }
         }
-        // Se a lista de capturas tiver algo, a IA é obrigada a usar ela. Senão, usa os normais.
         return capturas.isEmpty() ? movimentos : capturas;
     }
 

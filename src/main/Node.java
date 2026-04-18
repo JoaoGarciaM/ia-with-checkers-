@@ -1,29 +1,35 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package main;
 
 import java.util.ArrayList;
 
-/**
- *
- * @author Douglas
- */
 public class Node {
     
     private char origin;
     private char dest;
-    private boolean turn; //TRUE - white; FALSE - black;
+    private boolean turn; // TRUE - white; FALSE - black;
     private char[][] matrix;
     private int minMax;
     private ArrayList<Node> children;
     
-    public Node () {
+    // A PEÇA CHAVE: Guarda a melhor jogada futura
+    private Node melhorFilho; 
+    
+    public Node() {
         this.children = new ArrayList<>();
         this.minMax = Integer.MIN_VALUE;
+        this.melhorFilho = null; // Inicializa vazio
     }
+
+    // GETTERS E SETTERS 
+   
+    public Node getMelhorFilho() {
+        return melhorFilho;
+    }
+
+    public void setMelhorFilho(Node melhorFilho) {
+        this.melhorFilho = melhorFilho;
+    }
+
 
     public int getMinMax() {
         return minMax;
@@ -33,13 +39,11 @@ public class Node {
         this.minMax = minMax;
     }
     
-    
-    
-    public ArrayList<Node> getChild (){
+    public ArrayList<Node> getChild() {
         return this.children;
     }
     
-    public void addChild (Node child){
+    public void addChild(Node child) {
         this.children.add(child);
     }
     
@@ -74,7 +78,4 @@ public class Node {
     public void setMatrix(char[][] matrix) {
         this.matrix = matrix;
     }
-    
-    
-    
 }

@@ -4,11 +4,15 @@ public class Regras {
 
     private static final int TAMANHO = 6;
 
+    /**
+     * Verifica se qualquer peça do jogador da vez tem uma captura obrigatória.
+     */
     public static boolean alguemPodeComer(Tabuleiro tabuleiro, int vez, boolean sequenciaCaptura) {
         char[][] m = tabuleiro.getMatriz();
         for (int i = 0; i < TAMANHO; i++) {
             for (int j = 0; j < TAMANHO; j++) {
                 char peca = m[i][j];
+                // Verifica se a peça pertence ao jogador da vez
                 if ((peca != '0') && (peca != 'b') && (peca % 2 == vez % 2)) {
                     if (podeComer(tabuleiro, i, j, sequenciaCaptura)) {
                         return true;
@@ -19,6 +23,9 @@ public class Regras {
         return false;
     }
 
+    /**
+     * Verifica se uma peça específica pode realizar uma captura.
+     */
     public static boolean podeComer(Tabuleiro tabuleiro, int linha, int col, boolean sequencia) {
         char[][] m = tabuleiro.getMatriz();
         char peca = m[linha][col];
@@ -27,15 +34,18 @@ public class Regras {
         int[] dirLinha;
         int[] dirCol = new int[]{-1, 1}; 
 
+        // Regra: Damas ou peças em combo podem olhar para trás para comer
         if ((peca > '2') || sequencia) {
             dirLinha = new int[]{-1, 1};
         } else {
+            // Peças comuns no primeiro movimento só comem para frente
             dirLinha = (peca == '1') ? new int[]{-1} : new int[]{1};
         }
 
         for (int dl : dirLinha) {
             for (int dc : dirCol) {
                 if (peca <= '2') {
+                    // Lógica para Peça Comum (pula exatamente 2 casas)
                     int lMeio = linha + dl;
                     int cMeio = col + dc;
                     int lDestino = linha + (dl * 2);
@@ -50,6 +60,7 @@ public class Regras {
                         }
                     }
                 } else { 
+                    // Lógica para Dama (varre a diagonal procurando inimigo com espaço atrás)
                     for (int i = 1; i < TAMANHO; i++) {
                         int lInimigo = linha + (dl * i);
                         int cInimigo = col + (dc * i);
@@ -60,7 +71,7 @@ public class Regras {
 
                         char pecaCaminho = m[lInimigo][cInimigo];
                         if (pecaCaminho != '0' && pecaCaminho != 'b') {
-                            if (pecaCaminho % 2 == peca % 2) break; 
+                            if (pecaCaminho % 2 == peca % 2) break; // Bloqueio por peça aliada
                             if (m[lDestino][cDestino] == '0') return true; 
                             break; 
                         }
@@ -71,6 +82,9 @@ public class Regras {
         return false;
     }
 
+    /**
+     * Verifica se o caminho diagonal está livre (usado para movimento da Dama).
+     */
     public static boolean caminhoVazio(Tabuleiro tabuleiro, int r1, int c1, int r2, int c2) {
         char[][] m = tabuleiro.getMatriz();
         int dirLinha = (r2 > r1) ? 1 : -1;
@@ -88,6 +102,9 @@ public class Regras {
         return true;
     }
 
+    /**
+     * Tenta validar uma captura de Dama e retorna a posição do inimigo removido.
+     */
     public static int[] tentarCapturaDama(Tabuleiro tabuleiro, int r1, int c1, int r2, int c2) {
         char[][] m = tabuleiro.getMatriz();
         int dirLinha = (r2 > r1) ? 1 : -1;
@@ -96,9 +113,7 @@ public class Regras {
         int pecaInimigaCol = -1;
         int contadorInimigos = 0;
 
-        int distLinha = Math.abs(r2 - r1);
-        int distCol = Math.abs(c2 - c1);
-        if (distLinha != distCol) return null;
+        if (Math.abs(r2 - r1) != Math.abs(c2 - c1)) return null;
 
         int r = r1 + dirLinha;
         int c = c1 + dirCol;
@@ -106,7 +121,7 @@ public class Regras {
         while (r != r2) {
             char pecaNoCaminho = m[r][c];
             if (pecaNoCaminho != '0' && pecaNoCaminho != 'b') {
-                if (pecaNoCaminho % 2 == m[r1][c1] % 2) return null;
+                if (pecaNoCaminho % 2 == m[r1][c1] % 2) return null; // Peça amiga no caminho
                 contadorInimigos++;
                 pecaInimigaLinha = r;
                 pecaInimigaCol = c;
@@ -115,12 +130,44 @@ public class Regras {
             c += dirCol;
         }
 
+        // Regra simplificada: Dama captura e para logo após a peça inimiga
         if (contadorInimigos == 1) {
-            int distInimigoDestino = Math.abs(r2 - pecaInimigaLinha);
-            if (distInimigoDestino == 1) {
+            int rApos = pecaInimigaLinha + dirLinha;
+            int cApos = pecaInimigaCol + dirCol;
+            if (r2 == rApos && c2 == cApos) {
                 return new int[]{pecaInimigaLinha, pecaInimigaCol};
             }
         }
         return null;
+    }
+
+    public static boolean temMovimentoDisponivel(Tabuleiro tabuleiro, int vez) {
+        char[][] m = tabuleiro.getMatriz();
+        for (int i = 0; i < TAMANHO; i++) {
+            for (int j = 0; j < TAMANHO; j++) {
+                char peca = m[i][j];
+                if (peca != '0' && peca != 'b' && (peca % 2 == vez % 2)) {
+                    // 1. Tem captura disponível?
+                    if (podeComer(tabuleiro, i, j, false)) return true;
+
+                    // 2. Tem movimento normal disponível?
+                    if (peca <= '2') { // Comum
+                        int dir = (peca == '1') ? -1 : 1;
+                        for (int dc : new int[]{-1, 1}) {
+                            int nl = i + dir, nc = j + dc;
+                            if (nl >= 0 && nl < TAMANHO && nc >= 0 && nc < TAMANHO && m[nl][nc] == '0') return true;
+                        }
+                    } else { // Dama
+                        for (int dl : new int[]{-1, 1}) {
+                            for (int dc : new int[]{-1, 1}) {
+                                int nl = i + dl, nc = j + dc;
+                                if (nl >= 0 && nl < TAMANHO && nc >= 0 && nc < TAMANHO && m[nl][nc] == '0') return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 }

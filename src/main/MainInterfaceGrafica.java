@@ -2,6 +2,8 @@ package main;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.Random;
 
 public final class MainInterfaceGrafica extends JFrame {
 
@@ -12,6 +14,11 @@ public final class MainInterfaceGrafica extends JFrame {
     private int linhaOrigem = -1, colOrigem = -1;
     private int vez = 1;
     private boolean sequenciaCaptura = false;
+    
+    // CONTROLES DA IA
+    private boolean vezIA = true;
+    private int corIA = 2; // Por padrão IA joga de Pretas (2)
+    private int profundidadeIA = 8; // Dificuldade padrão
 
     public MainInterfaceGrafica() {
         tabuleiroLogico = new Tabuleiro();
@@ -20,27 +27,62 @@ public final class MainInterfaceGrafica extends JFrame {
         setSize(800, 800);
         setLayout(new GridLayout(TAMANHO, TAMANHO));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setResizable(false);
+
+        // Pergunta as configurações antes de renderizar
+        perguntarConfiguracoes();
 
         inicializarComponentes();
         sincronizarInterface(); 
 
         setVisible(true);
 
-        // --- TESTE DA ÁRVORE ---
-        System.out.println("\n=== LIGANDO O MOTOR DA IA ===");
-        long tempoInicio = System.currentTimeMillis();
-        
-        // Simula o jogo 4 turnos no futuro, começando com as Pretas (false)
-        Arvore arvoreDeTeste = new Arvore(tabuleiroLogico, false, 4); 
-        
-        long tempoFim = System.currentTimeMillis();
-        
-        // Quantas opções de jogada a IA tem AGORA no primeiro turno?
-        int opcoesIniciais = arvoreDeTeste.getRaiz().getChild().size();
-        
-        System.out.println("A IA encontrou " + opcoesIniciais + " opções de jogada no turno 1.");
-        System.out.println("Tempo para calcular o multiverso: " + (tempoFim - tempoInicio) + " milissegundos.");
-        System.out.println("===============================\n");
+        // Se o humano escolheu as Pretas, a IA é a Branca e deve dar o primeiro passo
+        if (vezIA && corIA == 1) {
+            jogarTurnoIA();
+        }
+    }
+
+    private void perguntarConfiguracoes() {
+        // 1. Pergunta a cor
+        Object[] options = {"Brancas (Começam)", "Pretas"};
+        int escolha = JOptionPane.showOptionDialog(this,
+                "Com qual cor você deseja jogar?",
+                "Configuração da Partida",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                options,
+                options[0]);
+
+        if (escolha == 1) {
+            corIA = 1; // Humano quer as Pretas, então IA fica com as Brancas
+        } else {
+            corIA = 2; // Humano quer as Brancas, então IA fica com as Pretas
+        }
+
+        // 2. Pergunta o nível de dificuldade (1 a 9) exigido no PDF
+        boolean inputValido = false;
+        while (!inputValido) {
+            String nivelStr = JOptionPane.showInputDialog(this, 
+                "Digite o nível de inteligência da IA (Profundidade de 1 a 9):", "8");
+            
+            if (nivelStr == null) {
+                System.exit(0); // Usuário cancelou
+            }
+            
+            try {
+                int nivel = Integer.parseInt(nivelStr);
+                if (nivel >= 1 && nivel <= 9) {
+                    profundidadeIA = nivel;
+                    inputValido = true;
+                } else {
+                    JOptionPane.showMessageDialog(this, "Por favor, digite um número entre 1 e 9.");
+                }
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this, "Entrada inválida. Digite um número.");
+            }
+        }
     }
 
     private void inicializarComponentes() {
@@ -63,27 +105,21 @@ public final class MainInterfaceGrafica extends JFrame {
     }
 
     private void tratarClique(int linha, int col) {
+        if (vezIA && vez == corIA) return;
 
-        // PERGUNTA PARA A CLASSE REGRAS SE ALGUÉM É OBRIGADO A COMER
         boolean checkComer = Regras.alguemPodeComer(tabuleiroLogico, vez, sequenciaCaptura);
         
-        // Caso 1: Nenhuma peça selecionada ainda
         if (linhaOrigem == -1) {
             char pecaClicada = tabuleiroLogico.getMatriz()[linha][col];
-            
             if ((pecaClicada != '0') && (pecaClicada != 'b') && (pecaClicada % 2 == vez % 2)) {
-                
-                // PERGUNTA PARA AS REGRAS SE ESSA PEÇA ESPECÍFICA PODE COMER
                 if(checkComer && !Regras.podeComer(tabuleiroLogico, linha, col, sequenciaCaptura)){
-                    return; // Bloqueia o clique
+                    return; 
                 }
-                
                 linhaOrigem = linha;
                 colOrigem = col;
                 tabuleiroInterface[linha][col].setBackground(Color.YELLOW);
             }
         } 
-        // Caso 2: Já existe uma peça selecionada, tentando mover
         else {
             if (linhaOrigem == linha && colOrigem == col) {
                 if(!sequenciaCaptura) cancelarSelecao();
@@ -97,26 +133,21 @@ public final class MainInterfaceGrafica extends JFrame {
             boolean sucesso = false;
             boolean comeuAlguem = false;
 
-            // MOVIMENTO NORMAL
             if (!checkComer) {
                 if (peca <= '2' && distLinha == 1 && distCol == 1) {
                     if ((peca == '1' && linha < linhaOrigem) || (peca == '2' && linha > linhaOrigem)) {
                         sucesso = moverPecaLogica(linhaOrigem, colOrigem, linha, col);
                     }
                 } else if (peca > '2' && distLinha == distCol) {
-                    
-                    // PERGUNTA PARA AS REGRAS SE O CAMINHO ESTÁ VAZIO
                     if (Regras.caminhoVazio(tabuleiroLogico, linhaOrigem, colOrigem, linha, col)) {
                         sucesso = moverPecaLogica(linhaOrigem, colOrigem, linha, col);
                     }
                 }
             } 
-            // MOVIMENTO DE CAPTURA
             else {
                 if (distLinha == distCol) { 
                     if (peca <= '2' && distLinha == 2) {
                         boolean sentidoValido = true;
-                        
                         if (!sequenciaCaptura) {
                             if (peca == '1' && linha > linhaOrigem) sentidoValido = false;
                             if (peca == '2' && linha < linhaOrigem) sentidoValido = false;
@@ -136,7 +167,6 @@ public final class MainInterfaceGrafica extends JFrame {
                             }
                         }
                     } else if (peca > '2') {
-                        // PERGUNTA PARA AS REGRAS SE A DAMA PODE CAPTURAR (Retorna a posição do inimigo morto)
                         int[] posInimiga = Regras.tentarCapturaDama(tabuleiroLogico, linhaOrigem, colOrigem, linha, col);
                         if(posInimiga != null) {
                             sucesso = moverPecaLogica(linhaOrigem, colOrigem, linha, col);
@@ -149,12 +179,10 @@ public final class MainInterfaceGrafica extends JFrame {
                 }
             }
 
-            // AVALIA O RESULTADO DO MOVIMENTO
             if (sucesso) {
                 sincronizarInterface();
                 verificarFimDeJogo();
 
-                // PERGUNTA PARA AS REGRAS SE O COMBO CONTINUA
                 if (comeuAlguem && Regras.podeComer(tabuleiroLogico, linha, col, true)) {
                     tabuleiroInterface[linhaOrigem][colOrigem].setBackground(new Color(119, 149, 86));
                     sequenciaCaptura = true;
@@ -165,11 +193,66 @@ public final class MainInterfaceGrafica extends JFrame {
                     vez = (vez == 1) ? 2 : 1;
                     sequenciaCaptura = false;
                     cancelarSelecao();
+
+                    verificarFimDeJogo(); // Verifica novamente antes da IA jogar
+
+                    if (vezIA && vez == corIA) {
+                        jogarTurnoIA();
+                    }
                 }
             } else {
                 if(!sequenciaCaptura) cancelarSelecao();
             }
         }
+    }
+
+    private void jogarTurnoIA() {
+        setTitle("A IA está pensando...");
+
+        new Thread(() -> {
+            boolean iaUsaBrancas = (corIA == 1);
+            Arvore arvore = new Arvore(tabuleiroLogico, iaUsaBrancas, profundidadeIA);
+
+            // Busca os melhores lances e aplica fator aleatório (Inteligência Simples)
+            ArrayList<Node> opcoes = arvore.getRaiz().getChild();
+            Node melhorJogada = null;
+
+            if (!opcoes.isEmpty()) {
+                // 1. Acha qual é a maior nota (melhor futuro)
+                int maxScore = Integer.MIN_VALUE;
+                for (Node filho : opcoes) {
+                    if (filho.getMinMax() > maxScore) {
+                        maxScore = filho.getMinMax();
+                    }
+                }
+
+                // 2. Coleta todas as jogadas que tiraram a nota máxima
+                ArrayList<Node> melhoresOpcoes = new ArrayList<>();
+                for (Node filho : opcoes) {
+                    if (filho.getMinMax() == maxScore) {
+                        melhoresOpcoes.add(filho);
+                    }
+                }
+
+                // 3. Sorteia aleatoriamente entre as melhores
+                int sorteio = new Random().nextInt(melhoresOpcoes.size());
+                melhorJogada = melhoresOpcoes.get(sorteio);
+            }
+
+            // Volta para a interface gráfica
+            Node jogadaEscolhida = melhorJogada;
+            SwingUtilities.invokeLater(() -> {
+                if (jogadaEscolhida != null) {
+                    tabuleiroLogico.setMatriz(jogadaEscolhida.getMatrix());
+                    sincronizarInterface();
+                    
+                    vez = (corIA == 1) ? 2 : 1;
+                    verificarFimDeJogo();
+                }
+                setTitle("DISCIPLINA - IA - MINI JOGO DE DAMA");
+            });
+
+        }).start(); 
     }
 
     private void cancelarSelecao() {
@@ -197,18 +280,42 @@ public final class MainInterfaceGrafica extends JFrame {
     }
 
     private void verificarFimDeJogo() {
+        // 1. Checagem de Asfixia (Jogador não tem movimentos disponíveis)
+        if (!Regras.temMovimentoDisponivel(tabuleiroLogico, vez)) {
+            String perdedor = (vez == 1) ? "Brancas" : "Pretas";
+            String vencedor = (vez == 1) ? "Pretas" : "Brancas";
+            JOptionPane.showMessageDialog(this, "FIM DE JOGO! As " + vencedor + " venceram! (" + perdedor + " bloqueado)");
+            System.exit(0);
+        }
+
+        // 2. Checagem de Eliminação (Sem peças)
         int brancas = 0, pretas = 0;
+        int damasBrancas = 0, damasPretas = 0;
+
         for (int i = 0; i < TAMANHO; i++) {
             for (int j = 0; j < TAMANHO; j++) {
                 char p = tabuleiroLogico.getMatriz()[i][j];
-                if (p == '1' || p == '3') brancas++;
-                if (p == '2' || p == '4') pretas++;
+                if (p == '1') brancas++;
+                if (p == '3') { brancas++; damasBrancas++; }
+                if (p == '2') pretas++;
+                if (p == '4') { pretas++; damasPretas++; }
             }
         }
+        
         if (brancas == 0) {
-            JOptionPane.showMessageDialog(this, "FIM DE JOGO! As Pretas venceram!");
+            JOptionPane.showMessageDialog(this, "FIM DE JOGO! As Pretas venceram por eliminação!");
+            System.exit(0);
         } else if (pretas == 0) {
-            JOptionPane.showMessageDialog(this, "FIM DE JOGO! As Brancas venceram!");
+            JOptionPane.showMessageDialog(this, "FIM DE JOGO! As Brancas venceram por eliminação!");
+            System.exit(0);
+        }
+
+        // 3. Regra de Empate: Somente 2 damas e ninguém pode comer
+        if (brancas == 1 && damasBrancas == 1 && pretas == 1 && damasPretas == 1) {
+            if (!Regras.alguemPodeComer(tabuleiroLogico, 1, false) && !Regras.alguemPodeComer(tabuleiroLogico, 2, false)) {
+                JOptionPane.showMessageDialog(this, "EMPATE! Apenas duas Damas restantes no tabuleiro.");
+                System.exit(0);
+            }
         }
     }
 
