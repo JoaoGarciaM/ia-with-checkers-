@@ -18,7 +18,7 @@ public final class MainInterfaceGrafica extends JFrame {
     // CONTROLES DA IA
     private boolean vezIA = true;
     private int corIA = 2; // Por padrão IA joga de Pretas (2)
-    private int profundidadeIA = 8; // Dificuldade padrão
+    private int profundidadeIA = 9; // Dificuldade padrão
 
     public MainInterfaceGrafica() {
         tabuleiroLogico = new Tabuleiro();
@@ -61,7 +61,7 @@ public final class MainInterfaceGrafica extends JFrame {
             corIA = 2; // Humano quer as Brancas, então IA fica com as Pretas
         }
 
-        // 2. Pergunta o nível de dificuldade (1 a 9) exigido no PDF
+        // 2. Pergunta o nível de dificuldade (1 a 9) 
         boolean inputValido = false;
         while (!inputValido) {
             String nivelStr = JOptionPane.showInputDialog(this, 
@@ -211,9 +211,22 @@ public final class MainInterfaceGrafica extends JFrame {
 
         new Thread(() -> {
             boolean iaUsaBrancas = (corIA == 1);
-            Arvore arvore = new Arvore(tabuleiroLogico, iaUsaBrancas, profundidadeIA);
 
-            // Busca os melhores lances e aplica fator aleatório (Inteligência Simples)
+            // --- INÍCIO DO CRONÔMETRO E CONTAGEM ---
+            long tempoInicio = System.currentTimeMillis();
+            
+            Arvore arvore = new Arvore(tabuleiroLogico, iaUsaBrancas, profundidadeIA);
+            
+            // --- FIM DO CRONÔMETRO ---
+            long tempoFim = System.currentTimeMillis();
+            
+            // IMPRIME O RELATÓRIO NO TERMINAL DO VS CODE
+            System.out.println("--- TURNO DA IA ---");
+            System.out.println("Nível de Dificuldade: " + profundidadeIA);
+            System.out.println("Futuros calculados (Nós): " + Arvore.nosAvaliados);
+            System.out.println("Tempo de processamento: " + (tempoFim - tempoInicio) + " ms\n");
+
+            // Busca os melhores lances e aplica o fator aleatório em caso de empate de notas
             ArrayList<Node> opcoes = arvore.getRaiz().getChild();
             Node melhorJogada = null;
 
@@ -234,12 +247,12 @@ public final class MainInterfaceGrafica extends JFrame {
                     }
                 }
 
-                // 3. Sorteia aleatoriamente entre as melhores
+                // 3. Sorteia aleatoriamente entre as melhores opções (Inteligência simulada)
                 int sorteio = new Random().nextInt(melhoresOpcoes.size());
                 melhorJogada = melhoresOpcoes.get(sorteio);
             }
 
-            // Volta para a interface gráfica
+            // Volta para a interface gráfica para atualizar a tela
             Node jogadaEscolhida = melhorJogada;
             SwingUtilities.invokeLater(() -> {
                 if (jogadaEscolhida != null) {

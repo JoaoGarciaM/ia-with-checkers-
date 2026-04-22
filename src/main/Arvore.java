@@ -7,8 +7,11 @@ public class Arvore {
     private Node raiz;
     private int profundidadeMaxima;
     private static final int TAMANHO = 6;
+    
+    private boolean iaUsaBrancas; 
 
-    // Mapa para traduzir linha/coluna para as letras exigidas pelo seu Node
+    public static int nosAvaliados = 0;
+
     private static final char[][] MAPA_LETRAS = {
             { 0, 'A', 0, 'B', 0, 'C' },
             { 'D', 0, 'E', 0, 'F', 0 },
@@ -18,51 +21,41 @@ public class Arvore {
             { 'P', 0, 'Q', 0, 'R', 0 }
     };
 
-    public Arvore(Tabuleiro tabuleiro, boolean turnoBrancas) {
-        this(tabuleiro, turnoBrancas, 10); 
-    }
-
     public Arvore(Tabuleiro tabuleiro, boolean turnoBrancas, int profundidadeMaxima) {
+        nosAvaliados = 0;
         this.profundidadeMaxima = profundidadeMaxima;
+        this.iaUsaBrancas = turnoBrancas; // Salva a identidade da IA
         this.raiz = new Node();
         
         this.raiz.setMatrix(copiarMatriz(tabuleiro.getMatriz()));
         this.raiz.setTurn(turnoBrancas);
         
         int vez = turnoBrancas ? 1 : 2;
-        
-        // Pega as opções do presente (Nível 1)
         ArrayList<int[]> jogadasDaRaiz = gerarJogadasPossiveis(tabuleiro, vez);
 
         int bestValue = Integer.MIN_VALUE;
         int alpha = Integer.MIN_VALUE;
         int beta = Integer.MAX_VALUE;
 
-        // Instancia na memória APENAS os filhos diretos
         for (int[] jogada : jogadasDaRaiz) {
             int lOrig = jogada[0], cOrig = jogada[1], lDest = jogada[2], cDest = jogada[3];
 
-            // Simula o movimento
             Tabuleiro tFilho = tabuleiro.clone();
             aplicarMovimentoSimulado(tFilho, lOrig, cOrig, lDest, cDest);
 
-            // Cria o nó
             Node filho = new Node();
             filho.setOrigin(MAPA_LETRAS[lOrig][cOrig]);
             filho.setDest(MAPA_LETRAS[lDest][cDest]);
             filho.setMatrix(copiarMatriz(tFilho.getMatriz()));
             filho.setTurn(!turnoBrancas);
 
-            // Manda a IA avaliar o futuro DENTRO da memória RAM usando poda Alpha-Beta
             int score = calcularAlphaBeta(tFilho, 1, alpha, beta, !turnoBrancas);
             filho.setMinMax(score);
             
             this.raiz.addChild(filho);
 
-            // A Raiz sempre quer o MAIOR valor possível para o turno dela
             if (score > bestValue) {
                 bestValue = score;
-                // SALVA A MEMÓRIA: Guarda qual foi a jogada que deu a nota máxima!
                 this.raiz.setMelhorFilho(filho); 
             }
             alpha = Math.max(alpha, bestValue);
@@ -71,9 +64,8 @@ public class Arvore {
         this.raiz.setMinMax(bestValue);
     }
 
-    // Prevê o futuro sem gastar a memória instanciando Nodes
     private int calcularAlphaBeta(Tabuleiro tabAtual, int profundidade, int alpha, int beta, boolean turnoBrancas) {
-        // Condição de parada (Limite de visão)
+        nosAvaliados++;
         if (profundidade >= profundidadeMaxima) {
             return avaliarTabuleiro(tabAtual.getMatriz());
         }
@@ -81,12 +73,13 @@ public class Arvore {
         int vez = turnoBrancas ? 1 : 2;
         ArrayList<int[]> jogadas = gerarJogadasPossiveis(tabAtual, vez);
 
-        // Se o jogador está travado sem jogadas
+        // CORREÇÃO DO BUG SUICIDA: 
         if (jogadas.isEmpty()) {
-            return turnoBrancas ? -10000 : 10000;
+            // Se quem não tem jogada é a IA, isso é péssimo (-10000). Se for o Humano, é vitória da IA (+10000)
+            return (turnoBrancas == iaUsaBrancas) ? -10000 : 10000;
         }
 
-        if (turnoBrancas == this.raiz.isTurn()) { 
+        if (turnoBrancas == iaUsaBrancas) { // Turno da IA (Maximizando)
             int maxEval = Integer.MIN_VALUE;
             for (int[] jogada : jogadas) {
                 Tabuleiro clone = tabAtual.clone();
@@ -96,11 +89,11 @@ public class Arvore {
                 maxEval = Math.max(maxEval, eval);
                 alpha = Math.max(alpha, eval);
                 
-                if (beta <= alpha) break; // Poda (corta a árvore)
+                if (beta <= alpha) break; 
             }
             return maxEval;
         } 
-        else { 
+        else { // Turno do Humano (Minimizando)
             int minEval = Integer.MAX_VALUE;
             for (int[] jogada : jogadas) {
                 Tabuleiro clone = tabAtual.clone();
@@ -110,26 +103,54 @@ public class Arvore {
                 minEval = Math.min(minEval, eval);
                 beta = Math.min(beta, eval);
                 
-                if (beta <= alpha) break; // Poda Alpha-Beta
+                if (beta <= alpha) break; 
             }
             return minEval;
         }
     }
 
-    // Heurística simples: Conta as peças e dá peso maior para as damas
     private int avaliarTabuleiro(char[][] m) {
         int pontuacao = 0;
+        
+        // Define quem é quem de forma dinâmica
+        char minhaPeca = iaUsaBrancas ? '1' : '2';
+        char minhaDama = iaUsaBrancas ? '3' : '4';
+
         for (int i = 0; i < 6; i++) {
             for (int j = 0; j < 6; j++) {
                 char peca = m[i][j];
-                if (peca == '2') pontuacao += 10;       // Peça normal da IA
-                else if (peca == '4') pontuacao += 30;  // Dama da IA
-                else if (peca == '1') pontuacao -= 10;  // Peça normal do Jogador
-                else if (peca == '3') pontuacao -= 30;  // Dama do Jogador
+                
+                if (peca == '0' || peca == 'b') continue;
+
+                int valorPeca = 0;
+                boolean ehMinha = (peca == minhaPeca || peca == minhaDama);
+                boolean ehDama = (peca == '3' || peca == '4');
+
+                // 1. VIDA (Dama vale mais que peça normal)
+                valorPeca += ehDama ? 300 : 100;
+
+                // 2. POSIÇÃO (Centro e Bordas)
+                if ((i == 2 || i == 3) && (j == 2 || j == 3)) valorPeca += 15;
+                if (j == 0 || j == 5) valorPeca += 10;
+
+                // 3. DEFESA DE BASE DEPENDENDO DA COR
+                if (peca == '2' || peca == '4') { // Pretas (Iniciam em cima e descem. Base é 0)
+                    if (i == 0) valorPeca += 40;
+                    if (i > 0 && j > 0 && (m[i-1][j-1] == '2' || m[i-1][j-1] == '4')) valorPeca += 15;
+                    if (i > 0 && j < 5 && (m[i-1][j+1] == '2' || m[i-1][j+1] == '4')) valorPeca += 15;
+                } else { // Brancas (Iniciam embaixo e sobem. Base é 5)
+                    if (i == 5) valorPeca += 40;
+                    if (i < 5 && j > 0 && (m[i+1][j-1] == '1' || m[i+1][j-1] == '3')) valorPeca += 15;
+                    if (i < 5 && j < 5 && (m[i+1][j+1] == '1' || m[i+1][j+1] == '3')) valorPeca += 15;
+                }
+
+                // Se a peça for da IA, soma. Se for sua, subtrai!
+                pontuacao += ehMinha ? valorPeca : -valorPeca;
             }
         }
         return pontuacao;
     }
+
 
     private ArrayList<int[]> gerarJogadasPossiveis(Tabuleiro tab, int vez) {
         ArrayList<int[]> movimentos = new ArrayList<>();
