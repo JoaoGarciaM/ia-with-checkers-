@@ -107,14 +107,23 @@ public final class MainInterfaceGrafica extends JFrame {
     private void tratarClique(int linha, int col) {
         if (vezIA && vez == corIA) return;
 
-        boolean checkComer = Regras.alguemPodeComer(tabuleiroLogico, vez, sequenciaCaptura);
+        
+        int comboMaximoGeral = Regras.getMaiorComboDoJogador(tabuleiroLogico, vez);
+        boolean checkComer = comboMaximoGeral > 0;
         
         if (linhaOrigem == -1) {
             char pecaClicada = tabuleiroLogico.getMatriz()[linha][col];
             if ((pecaClicada != '0') && (pecaClicada != 'b') && (pecaClicada % 2 == vez % 2)) {
-                if(checkComer && !Regras.podeComer(tabuleiroLogico, linha, col, sequenciaCaptura)){
-                    return; 
+                
+                // BLOQUEIO DA LEI DA MAIORIA
+                if (checkComer) {
+                    int comboDestaPeca = Regras.getMaiorComboDaPeca(tabuleiroLogico, linha, col, sequenciaCaptura);
+                    if (comboDestaPeca < comboMaximoGeral) {
+                        JOptionPane.showMessageDialog(this, "Lei da Maioria: Você tem outra peça que realiza um combo maior!");
+                        return; 
+                    }
                 }
+
                 linhaOrigem = linha;
                 colOrigem = col;
                 tabuleiroInterface[linha][col].setBackground(Color.YELLOW);
